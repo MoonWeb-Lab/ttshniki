@@ -431,7 +431,7 @@
 
     <!-- TAB 1: FORM -->
     <div id="tab-apply" class="content-section active">
-        <div class="card">
+        <div class="card" id="formCard">
             <div class="section-header">
                 <span><i class="fa-solid fa-id-card"></i> АНКЕТА КАНДИДАТА</span>
                 <span style="font-size: 11px; color: var(--text-muted);">Быстрый ответ</span>
@@ -522,6 +522,44 @@
                 </div>
             </form>
         </div>
+
+        <!-- SUCCESS CARD (ПОСЛЕ УСПЕШНОЙ ОТПРАВКИ) -->
+        <div class="card" id="successCard" style="display: none; text-align: center; padding: 28px 18px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); border: 2px solid #10b981; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">
+                <i class="fa-solid fa-check" style="font-size: 28px; color: #10b981;"></i>
+            </div>
+            
+            <h3 style="font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 8px;">Заявка принята! 🔥</h3>
+            
+            <p id="successNickMsg" style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                Твоя анкета уже отправлена лидерам клана в чат. Если тебя ещё нет в нашей группе — обязательно залетай прямо сейчас, чтобы познакомиться с составом и играть вместе!
+            </p>
+
+            <a href="https://t.me/+ZNJiduyqiXc2YmQy" target="_blank" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-bottom: 12px; background: linear-gradient(90deg, #00f2fe, #ff0055); box-shadow: 0 4px 18px rgba(255, 0, 85, 0.35);">
+                <i class="fa-solid fa-user-plus"></i> ВСТУПИТЬ В ЧАТ КЛАНА ТТШНИКИ
+            </a>
+
+            <button type="button" class="btn-secondary" onclick="resetForm()" style="margin-top: 6px;">
+                <i class="fa-solid fa-rotate-left"></i> Подать ещё одну анкету
+            </button>
+        </div>
+
+        <!-- FALLBACK CARD (ЕСЛИ СЕТЬ БЛОКИРУЕТ API) -->
+        <div class="card" id="fallbackCard" style="display: none; text-align: center; padding: 22px 16px; border: 1px solid rgba(255, 0, 85, 0.4);">
+            <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 0, 85, 0.15); border: 2px solid var(--accent-pink); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                <i class="fa-solid fa-paper-plane" style="font-size: 22px; color: var(--accent-pink);"></i>
+            </div>
+            <h4 style="font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 6px;">Отправить напрямую главе</h4>
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 16px;">
+                Провайдер ограничил автоматическую отправку. Нажми кнопку ниже — текст анкеты уже скопирован и откроется диалог с лидером клана:
+            </p>
+            <a id="directLeaderBtn" href="https://t.me/WiliestM00N" target="_blank" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-bottom: 10px;">
+                <i class="fa-brands fa-telegram"></i> ОТПРАВИТЬ ЛИЧНО ГЛАВЕ КЛАНА
+            </a>
+            <button type="button" class="btn-secondary" onclick="hideFallback()">
+                <i class="fa-solid fa-arrow-left"></i> Вернуться к анкете
+            </button>
+        </div>
     </div>
 
     <!-- TAB 2: REQUIREMENTS -->
@@ -589,8 +627,10 @@
 
 <script>
     const TELEGRAM_BOT_TOKEN = "9158129292:AAER7EjXp6FurLK1poyxMtvcZhhgyn0KwMg";
-    // Указан ID группы клана
+    // ID группы клана ТТшники
     const TELEGRAM_CHAT_ID = "-1004355844765";
+    const GROUP_INVITE_LINK = "https://t.me/+ZNJiduyqiXc2YmQy";
+    const CLAN_LEADER_USERNAME = "WiliestM00N";
 
     const tg = window.Telegram ? window.Telegram.WebApp : null;
 
@@ -599,14 +639,20 @@
         try { tg.setHeaderColor('#0b0d14'); } catch(e){}
         
         // Автозаполнение username, сохраняя @
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.username) {
-            document.getElementById('telegram').value = '@' + tg.initDataUnsafe.user.username;
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            const u = tg.initDataUnsafe.user;
+            if (u.username) {
+                document.getElementById('telegram').value = '@' + u.username;
+            } else if (u.first_name) {
+                document.getElementById('telegram').value = u.first_name + (u.last_name ? ' ' + u.last_name : '');
+            }
         }
     }
 
-    // Защита от удаления символа @ в телеграме
+    // Защита символа @ в телеграме (если вводят ник)
     function enforceAtSymbol(input) {
-        if (!input.value.startsWith('@')) {
+        if (!input.value.trim()) return;
+        if (!input.value.startsWith('@') && !/^\d+$/.test(input.value)) {
             input.value = '@' + input.value.replace(/@/g, '');
         }
     }
@@ -619,8 +665,15 @@
         }
     }
 
-    function sanitizeHTML(str) {
-        const div = document.createElement('div'); div.textContent = str; return div.innerHTML;
+    // Надежное экранирование HTML от сбоев Telegram API
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // Переключение вкладок
@@ -641,7 +694,7 @@
     function formatTikTokValue(val) {
         if (!val || val.trim() === '') return 'Нет';
         const lower = val.trim().toLowerCase();
-        if (['нет', 'нету', 'нет профиля', 'нет аккаунта', '-', 'no'].includes(lower)) {
+        if (['нет', 'нету', 'нет профиля', 'нет аккаунта', '-', 'no', 'none'].includes(lower)) {
             return 'Нет';
         }
         return val.trim();
@@ -691,7 +744,24 @@
         }, 3500);
     }
 
-    // Отправка формы в группу клана без кнопок подтверждения
+    function resetForm() {
+        document.getElementById('clanForm').reset();
+        document.getElementById('formCard').style.display = 'block';
+        document.getElementById('successCard').style.display = 'none';
+        document.getElementById('fallbackCard').style.display = 'none';
+        if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.username) {
+            document.getElementById('telegram').value = '@' + tg.initDataUnsafe.user.username;
+        } else {
+            document.getElementById('telegram').value = '@';
+        }
+    }
+
+    function hideFallback() {
+        document.getElementById('formCard').style.display = 'block';
+        document.getElementById('fallbackCard').style.display = 'none';
+    }
+
+    // Отправка формы в группу клана (защищена от сбоев Markdown и доступна ВСЕМ)
     function handleFormSubmit(e) {
         e.preventDefault();
 
@@ -706,29 +776,52 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Отправка...';
 
-        const nickname = sanitizeHTML(document.getElementById('nickname').value.trim());
-        const gameId = sanitizeHTML(gameIdVal);
-        const telegram = sanitizeHTML(document.getElementById('telegram').value.trim());
-        const tiktok = sanitizeHTML(formatTikTokValue(document.getElementById('tiktok').value));
-        const age = sanitizeHTML(document.getElementById('age').value.trim());
-        const primetime = sanitizeHTML(document.getElementById('primetime').value);
-        const userLang = sanitizeHTML(document.getElementById('userLang').value);
+        const nickname = document.getElementById('nickname').value.trim();
+        const gameId = gameIdVal;
+        const rawTelegram = document.getElementById('telegram').value.trim();
+        const tiktok = formatTikTokValue(document.getElementById('tiktok').value);
+        const age = document.getElementById('age').value.trim();
+        const primetime = document.getElementById('primetime').value;
+        const userLang = document.getElementById('userLang').value;
 
-        const messageText = `✨ *Новая заявка в клан ТТшники!*\n\n` +
-                            `👤 *Ник:* ${nickname}\n` +
-                            `🆔 *ID:* ${gameId}\n` +
-                            `📱 *Telegram:* ${telegram}\n` +
-                            `🎬 *TikTok:* ${tiktok}\n` +
-                            `⏰ *Возраст / Прайм-тайм:* ${age} лет (${primetime})\n` +
-                            `🌐 *Язык:* ${userLang}`;
+        // Формирование кликабельного контакта Telegram
+        let tgContactHTML = '';
+        const cleanUser = rawTelegram.replace(/^@/, '').trim();
+        if (cleanUser && !/^\d+$/.test(cleanUser)) {
+            tgContactHTML = `<a href="https://t.me/${escapeHTML(cleanUser)}">@${escapeHTML(cleanUser)}</a>`;
+        } else {
+            tgContactHTML = escapeHTML(rawTelegram) || 'Не указан';
+        }
+
+        // Если заявка отправлена из Telegram WebApp, добавляем прямой переход к диалогу
+        let tgProfileLinkHTML = '';
+        if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            const u = tg.initDataUnsafe.user;
+            const linkName = u.username ? '@' + u.username : (u.first_name || 'Написать в ЛС');
+            tgProfileLinkHTML = `\n👤 <b>Профиль в TG:</b> <a href="tg://user?id=${u.id}">${escapeHTML(linkName)}</a> (ID: <code>${u.id}</code>)`;
+        }
+
+        // Формируем сообщение в HTML (никогда не падает на нижних подчеркиваниях в никах)
+        const messageHTML = 
+            `✨ <b>Новая заявка в клан ТТшники!</b>\n\n` +
+            `👤 <b>Игровой Ник:</b> ${escapeHTML(nickname)}\n` +
+            `🆔 <b>Игровой ID:</b> <code>${escapeHTML(gameId)}</code>\n` +
+            `📱 <b>Telegram:</b> ${tgContactHTML}${tgProfileLinkHTML}\n` +
+            `🎬 <b>TikTok:</b> ${escapeHTML(tiktok)}\n` +
+            `⏰ <b>Возраст / Прайм:</b> ${escapeHTML(age)} лет (${escapeHTML(primetime)})\n` +
+            `🌐 <b>Язык общения:</b> ${escapeHTML(userLang)}`;
+
+        // Чистый текст для запасного канала отправки
+        const plainSummary = generateText();
 
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: TELEGRAM_CHAT_ID,
-                text: messageText,
-                parse_mode: 'Markdown'
+                text: messageHTML,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true
             })
         })
         .then(res => res.json())
@@ -737,22 +830,36 @@
                 if (tg && tg.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred('success');
                 }
-                showToast(`Спасибо, ${nickname}! Заявка отправлена в чат клана.`);
-                setTimeout(() => {
-                    try { tg.close(); } catch(err){}
-                }, 1500);
+                showToast(`Заявка успешно отправлена!`);
+                
+                // Переключаем на красивый экран успеха с кнопкой вступления в группу
+                document.getElementById('formCard').style.display = 'none';
+                document.getElementById('fallbackCard').style.display = 'none';
+                const successCard = document.getElementById('successCard');
+                successCard.style.display = 'block';
+                document.getElementById('successNickMsg').innerHTML = 
+                    `Спасибо, <strong>${escapeHTML(nickname)}</strong>! Твоя анкета уже в чате клана. Если тебя ещё нет в группе — вступай прямо сейчас, чтобы познакомиться с составом и играть вместе!`;
+
             } else {
-                throw new Error(data.description || 'Ошибка отправки');
+                throw new Error(data.description || 'Ошибка Telegram API');
             }
         })
         .catch(err => {
-            console.error(err);
+            console.error('Ошибка отправки через API бота:', err);
             if (tg && tg.HapticFeedback) {
                 tg.HapticFeedback.notificationOccurred('error');
             }
-            showToast("Ошибка отправки! Убедитесь, что бот добавлен в группу как админ.", true);
+            showToast("Сбой соединения с ботом! Открываем запасной способ...", true);
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ОТПРАВИТЬ ЗАЯВКУ В ТЕЛЕГРАМ';
+
+            // Показываем резервный способ отправки лично главе клана
+            document.getElementById('formCard').style.display = 'none';
+            const fallbackCard = document.getElementById('fallbackCard');
+            fallbackCard.style.display = 'block';
+            
+            const directLink = `https://t.me/${CLAN_LEADER_USERNAME}?text=${encodeURIComponent(plainSummary)}`;
+            document.getElementById('directLeaderBtn').href = directLink;
         });
     }
 </script>
