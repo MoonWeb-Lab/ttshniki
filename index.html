@@ -531,15 +531,15 @@
             
             <h3 style="font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 8px;">Заявка принята! 🔥</h3>
             
-            <p id="successNickMsg" style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
-                Твоя анкета уже отправлена лидерам клана в чат. Если тебя ещё нет в нашей группе — обязательно залетай прямо сейчас, чтобы познакомиться с составом и играть вместе!
+            <p id="successNickMsg" style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">
+                Твоя анкета отправлена руководству клана. Лидеры рассмотрят её и свяжутся с тобой в Telegram для проверки и добавления в состав!
             </p>
 
-            <a href="https://t.me/+ZNJiduyqiXc2YmQy" target="_blank" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-bottom: 12px; background: linear-gradient(90deg, #00f2fe, #ff0055); box-shadow: 0 4px 18px rgba(255, 0, 85, 0.35);">
-                <i class="fa-solid fa-user-plus"></i> ВСТУПИТЬ В ЧАТ КЛАНА ТТШНИКИ
-            </a>
+            <button type="button" class="btn-primary" onclick="closeApp()" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px;">
+                <i class="fa-solid fa-check"></i> ОТЛИЧНО, ЖДУ ОТВЕТА
+            </button>
 
-            <button type="button" class="btn-secondary" onclick="resetForm()" style="margin-top: 6px;">
+            <button type="button" class="btn-secondary" onclick="resetForm()">
                 <i class="fa-solid fa-rotate-left"></i> Подать ещё одну анкету
             </button>
         </div>
@@ -629,7 +629,6 @@
     const TELEGRAM_BOT_TOKEN = "9158129292:AAER7EjXp6FurLK1poyxMtvcZhhgyn0KwMg";
     // ID группы клана ТТшники
     const TELEGRAM_CHAT_ID = "-1004355844765";
-    const GROUP_INVITE_LINK = "https://t.me/+ZNJiduyqiXc2YmQy";
     const CLAN_LEADER_USERNAME = "WiliestM00N";
 
     const tg = window.Telegram ? window.Telegram.WebApp : null;
@@ -744,6 +743,14 @@
         }, 3500);
     }
 
+    function closeApp() {
+        if (tg && typeof tg.close === 'function') {
+            try { tg.close(); } catch(e) {}
+        } else {
+            showToast("Заявка принята! Можно закрыть страницу.");
+        }
+    }
+
     function resetForm() {
         document.getElementById('clanForm').reset();
         document.getElementById('formCard').style.display = 'block';
@@ -832,13 +839,13 @@
                 }
                 showToast(`Заявка успешно отправлена!`);
                 
-                // Переключаем на красивый экран успеха с кнопкой вступления в группу
+                // Переключаем на красивый экран успеха
                 document.getElementById('formCard').style.display = 'none';
                 document.getElementById('fallbackCard').style.display = 'none';
                 const successCard = document.getElementById('successCard');
                 successCard.style.display = 'block';
                 document.getElementById('successNickMsg').innerHTML = 
-                    `Спасибо, <strong>${escapeHTML(nickname)}</strong>! Твоя анкета уже в чате клана. Если тебя ещё нет в группе — вступай прямо сейчас, чтобы познакомиться с составом и играть вместе!`;
+                    `Спасибо, <strong>${escapeHTML(nickname)}</strong>! Твоя анкета отправлена руководству клана. Лидеры рассмотрят её и свяжутся с тобой в Telegram для проверки и добавления в состав!`;
 
             } else {
                 throw new Error(data.description || 'Ошибка Telegram API');
